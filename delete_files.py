@@ -1,13 +1,20 @@
+""" Вспомогательный модуль программы парсинга сайта modelart111.com
+"""
 import os  # модуль для работы с операционной системой
 
-# удалить все файлы из папок "Report" и "images":
-def delete_files(dir_name):
+
+def delete_files(dir_name: str):
+    """Функция удаляет все файлы из вспомогательных папок проекта:
+    "Report" - для сформированных отчётных файлов Excel
+    "images" - для сохранённых изображений
+    """
     # dir_name = "Report/"
-    files = os.listdir(dir_name)
-    for files in files:
-        files = dir_name + files
-        print("Файл " + files + " удалён")
-        os.remove(files)
+    all_files = os.listdir(dir_name)
+    for file in all_files:
+        file = dir_name + file
+        print("Файл " + file + " удалён")
+        os.remove(file)
+
 
 delete_files("Report/")
 delete_files("images/")
