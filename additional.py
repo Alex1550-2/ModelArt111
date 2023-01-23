@@ -16,5 +16,6 @@ def delete_files(dir_name: str):
         os.remove(file)
 
 
-delete_files("Report/")
-delete_files("images/")
+if __name__ == "__main__":
+    delete_files("Report/")
+    delete_files("images/")

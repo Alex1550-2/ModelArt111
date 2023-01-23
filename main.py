@@ -2,26 +2,13 @@
 """
 import datetime
 import re
-import time
+from typing import Union
 
 import requests
 import xlsxwriter
 from bs4 import BeautifulSoup
 
-
-def wait(time_interval: int):
-    """Функция разделяет процесс ожидания на отдельные интервалы ms,
-    позволяя реализовать прерывание процесса sleep непосредственно во время процесса sleep
-    """
-    delta_sleep: int = (
-        50  # интервал 50 мс - это гарантированных два-три нажатия на клавишу
-    )
-    step_sleep = time_interval // delta_sleep
-
-    i: int = 1
-    while i < step_sleep:
-        i += 1
-        time.sleep(0.05)
+from utils import wait
 
 
 def replace_symbol(string: str) -> str:
@@ -29,6 +16,45 @@ def replace_symbol(string: str) -> str:
     string = string.replace(" ", "")
     string = string.replace(".", "_")
     return string
+
+
+def write_file_excel(search_word: str, dictionary_list: list[dict[str, Union[str, int]]]):
+    """Функция сохраняет данные из списка словарей dictionary_list[] в файл Excel"""
+    now = datetime.datetime.now()  # команда now - текущее дата/время
+    excel_file_name = (
+        "Report/"
+        + replace_symbol(search_word)
+        + "_"
+        + now.strftime("%Y_%m_%d_%H_%M_%S")
+        + ".xlsx"
+    )
+
+    # создаём новый файл Excel и открываем его на запись:
+    workbook = xlsxwriter.Workbook(excel_file_name)
+
+    # добавляем новый лист в файл xlsx
+    worksheet = workbook.add_worksheet(search_word)
+
+    # добавляем новый формат для выравнивание столбца D по правому краю:
+    cell_format = workbook.add_format({"align": "right"})
+
+    # настраиваем ширину столюцов файла xlsx:
+    worksheet.set_column("A:A", 4)
+    worksheet.set_column("B:B", 110)
+    worksheet.set_column("C:C", 60)
+    worksheet.set_column("D:D", 10)
+
+    dictionary_length = len(dictionary_list)
+    for excel_row_num in range(0, dictionary_length):
+        worksheet.write(excel_row_num, 0, dictionary_list[excel_row_num]["num"])
+        worksheet.write(excel_row_num, 1, dictionary_list[excel_row_num]["link"])
+        worksheet.write(excel_row_num, 2, dictionary_list[excel_row_num]["text"])
+        worksheet.write(
+            excel_row_num, 3, dictionary_list[excel_row_num]["price"], cell_format
+        )
+
+    # сохраняем и закрываем файл Excel:
+    workbook.close()
 
 
 def get_link(source_data: str) -> str:
@@ -105,32 +131,13 @@ def main(search_word: str):
 
     Ключевое слово по написанию должно совпадать с сайтом modelart111.com
     """
-    now = datetime.datetime.now()  # команда now - текущее дата/время
-    excel_file_name = (
-        "Report/"
-        + replace_symbol(search_word)
-        + "_"
-        + now.strftime("%Y_%m_%d_%H_%M_%S")
-        + ".xlsx"
-    )
-
-    # создаём новый файл Excel и открываем его на запись:
-    workbook = xlsxwriter.Workbook(excel_file_name)
-
-    # добавляем новый лист в файл xlsx
-    worksheet = workbook.add_worksheet(search_word)
-
-    # добавляем новый формат для выравнивание столбца D по правому краю:
-    cell_format = workbook.add_format({"align": "right"})
-
-    # настраиваем ширину столюцов файла xlsx:
-    worksheet.set_column("A:A", 4)
-    worksheet.set_column("B:B", 110)
-    worksheet.set_column("C:C", 60)
-    worksheet.set_column("D:D", 10)
+    print("Поисковое слово: " + search_word)
+    ask = input("Чтобы сохранить найденные фотографии введите 'y'")
 
     result_pages_num = 0  # номер поисковой страницы на сайте Modelart111.com
-    excel_row_num = 0  # Номер строки таблицы результатов Excel
+
+    dictionary_list = []  # основной список словарей с результатами поиска
+    list_row_num = 0  # Номер строки списка словарей
 
     while True:
         result_pages_num += 1
@@ -154,36 +161,28 @@ def main(search_word: str):
         items_link_list = soup.find_all("a", string=re.compile(search_word))
 
         for item_href in items_link_list:
-            excel_row_num += 1
+            list_row_num += 1
 
             # "случайный рекламный лот внизу" вызовет ошибку преобразования None в text:
             if item_href.find_next("td") is None:
-                excel_row_num -= 1
+                list_row_num -= 1
                 continue
 
-            worksheet.write(excel_row_num - 1, 0, excel_row_num)
-            worksheet.write(
-                excel_row_num - 1, 1, item_href.get("href")
-            )  # ссылка на страницу модели
-            worksheet.write(excel_row_num - 1, 2, item_href.text)  # текстовка
-            worksheet.write(
-                excel_row_num - 1,
-                3,
-                item_href.find_next("td").text,
-                cell_format,
-            )  # следующий тег
+            dictionary_list.append(
+                {
+                    "num": list_row_num,
+                    "link": item_href.get("href"),
+                    "text": item_href.text,
+                    "price": item_href.find_next("td").text,
+                }
+            )
 
             # сохраняем картинки jpeg/jpg из галереи "fancybox"
-            get_picture(item_href.get("href"))
+            if ask == "y":
+                get_picture(item_href.get("href"))
 
-            # вывод результатов на печать:
-            print(
-                item_href.get("href")
-                + " "
-                + item_href.text
-                + " "
-                + item_href.find_next("td").text
-            )
+            # вывод результатов на печать (текущий словарь из списка):
+            print(dictionary_list[list_row_num - 1])
 
         print("========================")
 
@@ -197,7 +196,8 @@ def main(search_word: str):
             # аварийный выход - просмотр больше 50 поисковых страниц
             print("Не нашли Next, поэтому цикл останавливаем")
 
-            workbook.close()  # сохраняем и закрываем файл Excel
+            # сохраняем данные из списка словарей dictionary_list[] в файл Excel:
+            write_file_excel(search_word, dictionary_list)
             return
 
         # ждём, чтобы не забанили:
