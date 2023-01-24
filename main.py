@@ -11,15 +11,43 @@ from bs4 import BeautifulSoup
 from utils import wait
 
 
-def replace_symbol(string: str) -> str:
-    """Функция возвращает строку без запрещённых / нежелательных символов в имени файла"""
-    string = string.replace(" ", "")
-    string = string.replace(".", "_")
-    return string
+class ContextManager:
+    """контекстный менеджер для Excel файла"""
+
+    def __init__(self, search_word):
+        """метод __init__ включает в себя начальные данные про объект
+        и выполняется после создания экземпляра класса инструкцией with
+        """
+        self.search_word = search_word
+        excel_file_name = set_file_name(search_word)
+        self.workbook = xlsxwriter.Workbook(excel_file_name)
+
+    def __enter__(self):
+        """метод __enter__ возвращает в качестве объекта сам себя,
+        чтобы можно было использовать open с инструкцией with
+        enter -> вход в context, также в методе можно выполнить
+        действия по настройке"""
+        worksheet = self.workbook.add_worksheet(self.search_word)
+
+        # добавляем новый формат для выравнивание столбца D по правому краю:
+        worksheet.cell_format = self.workbook.add_format({"align": "right"})
+
+        # настраиваем ширину столюцов файла xlsx:
+        worksheet.set_column("A:A", 4)
+        worksheet.set_column("B:B", 110)
+        worksheet.set_column("C:C", 60)
+        worksheet.set_column("D:D", 10)
+        return worksheet
+
+    def __exit__(self, *args):
+        """метод __exit__ выполняется всегда, независимо от возникновения
+        исключений (или ошибок), в методе
+        выход из context"""
+        self.workbook.close()
 
 
-def write_file_excel(search_word: str, dictionary_list: list[dict[str, Union[str, int]]]):
-    """Функция сохраняет данные из списка словарей dictionary_list[] в файл Excel"""
+def set_file_name(search_word: str) -> str:
+    """Функция создаёт имя отчётного файла Excel"""
     now = datetime.datetime.now()  # команда now - текущее дата/время
     excel_file_name = (
         "Report/"
@@ -28,33 +56,41 @@ def write_file_excel(search_word: str, dictionary_list: list[dict[str, Union[str
         + now.strftime("%Y_%m_%d_%H_%M_%S")
         + ".xlsx"
     )
+    return excel_file_name
 
-    # создаём новый файл Excel и открываем его на запись:
-    workbook = xlsxwriter.Workbook(excel_file_name)
 
-    # добавляем новый лист в файл xlsx
-    worksheet = workbook.add_worksheet(search_word)
+def replace_symbol(string: str) -> str:
+    """Функция возвращает строку без запрещённых / нежелательных символов в имени файла"""
+    string = string.replace(" ", "")
+    string = string.replace(".", "_")
+    return string
 
-    # добавляем новый формат для выравнивание столбца D по правому краю:
-    cell_format = workbook.add_format({"align": "right"})
 
-    # настраиваем ширину столюцов файла xlsx:
-    worksheet.set_column("A:A", 4)
-    worksheet.set_column("B:B", 110)
-    worksheet.set_column("C:C", 60)
-    worksheet.set_column("D:D", 10)
-
-    dictionary_length = len(dictionary_list)
-    for excel_row_num in range(0, dictionary_length):
-        worksheet.write(excel_row_num, 0, dictionary_list[excel_row_num]["num"])
-        worksheet.write(excel_row_num, 1, dictionary_list[excel_row_num]["link"])
-        worksheet.write(excel_row_num, 2, dictionary_list[excel_row_num]["text"])
-        worksheet.write(
-            excel_row_num, 3, dictionary_list[excel_row_num]["price"], cell_format
-        )
-
-    # сохраняем и закрываем файл Excel:
-    workbook.close()
+def write_file_excel(
+    search_word, dictionary_list: list[dict[str, Union[str, int]]]
+):
+    """Функция сохраняет данные из списка словарей dictionary_list[] в файл Excel
+    используем контекстный менеджер ContextManager, команда close() не требуется
+    """
+    with ContextManager(search_word) as worksheet:
+        #
+        dictionary_length = len(dictionary_list)
+        for excel_row_num in range(0, dictionary_length):
+            worksheet.write(
+                excel_row_num, 0, dictionary_list[excel_row_num]["num"]
+            )
+            worksheet.write(
+                excel_row_num, 1, dictionary_list[excel_row_num]["link"]
+            )
+            worksheet.write(
+                excel_row_num, 2, dictionary_list[excel_row_num]["text"]
+            )
+            worksheet.write(
+                excel_row_num,
+                3,
+                dictionary_list[excel_row_num]["price"],
+                worksheet.cell_format,
+            )
 
 
 def get_link(source_data: str) -> str:
