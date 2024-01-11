@@ -1,5 +1,6 @@
 """ Основной модуль программы парсинга сайта modelart111.com
 """
+import argparse
 import datetime
 import re
 from typing import Union
@@ -9,6 +10,27 @@ import xlsxwriter
 from bs4 import BeautifulSoup
 
 from utils import wait
+
+
+# определяем аргументы скрипта при использовании анализатора argparse:
+# вызов описания аргументов: python main -h
+parser = argparse.ArgumentParser(
+    description="modelart111.com: Search all models by builder name"
+)
+parser.add_argument(
+    "buildername", type=str, help="The name of the builder scale cars: 'Suber' or 'Barnett'"
+)
+parser.add_argument(
+    "savefoto", type=str, help="Save foto models options: 'yes'"
+)
+args = parser.parse_args()
+
+
+# словарь с именами сборщиков и их интерпритацией с сайта modelart111.com
+switch = {
+    "Suber": "F. Suber",
+    "Barnett": "Barnett S.",
+}
 
 
 def replace_symbol(string: str) -> str:
@@ -82,6 +104,7 @@ def get_link(source_data: str) -> str:
 
     if url_start_index == -1 or url_stop_index == -1:
         url_link_jpg = ""
+
     else:
         url_link_jpg = source_data[
             url_start_index : (url_stop_index + len(search_stop_phrase))
@@ -125,14 +148,22 @@ def get_picture(url_picture: str):
             handler.write(img_data)
 
 
-def main(search_word: str):
+def main():
     """Функция позволяет осуществлять поиск содержимого сайта modelart111.com
     по ключевому слову search_word - имя сборщика, например "F. Suber" / "Barnett S."
 
     Ключевое слово по написанию должно совпадать с сайтом modelart111.com
     """
-    print("Поисковое слово: " + search_word)
-    ask = input("Чтобы сохранить найденные фотографии введите 'y'")
+
+    # определяем аргументы скрипта:
+    search_word: str = switch.get(str(args.buildername))   # имя сборщика
+    ask: str = args.savefoto   # сохраняем фото или нет
+
+    if search_word == None:
+        print("Имя сборщика не найдено!")
+        return
+
+    print(f"Поисковое слово: {search_word}")
 
     result_pages_num = 0  # номер поисковой страницы на сайте Modelart111.com
 
@@ -155,7 +186,7 @@ def main(search_word: str):
         # print(soup.prettify())
 
         print("========================")
-        print("Page " + str(result_pages_num))
+        print(f"Page {str(result_pages_num)}")
 
         # поиск "ссылок на предметы" по ключевому слову:
         items_link_list = soup.find_all("a", string=re.compile(search_word))
@@ -178,7 +209,7 @@ def main(search_word: str):
             )
 
             # сохраняем картинки jpeg/jpg из галереи "fancybox"
-            if ask == "y":
+            if ask == "yes":
                 get_picture(item_href.get("href"))
 
             # вывод результатов на печать (текущий словарь из списка):
@@ -205,5 +236,4 @@ def main(search_word: str):
 
 
 if __name__ == "__main__":
-    main("F. Suber")
-    # main("Barnett S.")
+    main()

@@ -12,7 +12,7 @@ def delete_files(dir_name: str):
     all_files = os.listdir(dir_name)
     for file in all_files:
         file = dir_name + file
-        print("Файл " + file + " удалён")
+        print(f"Файл {file} удалён")
         os.remove(file)
 
 
